@@ -56,6 +56,7 @@ func Auth(c redis.Connection, args [][]byte) redis.Reply {
 	if len(args) != 1 {
 		return protocol.MakeErrReply("ERR wrong number of arguments for 'auth' command")
 	}
+	// 这里我们没有设置密码
 	if config.Properties.RequirePass == "" {
 		return protocol.MakeErrReply("ERR Client sent AUTH, but no password is set")
 	}

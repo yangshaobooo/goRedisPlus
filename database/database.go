@@ -75,17 +75,17 @@ func makeBasicDB() *DB {
 func (db *DB) Exec(c redis.Connection, cmdLine [][]byte) redis.Reply {
 	// transaction control commands and other commands which cannot execute within transaction
 	cmdName := strings.ToLower(string(cmdLine[0]))
-	if cmdName == "multi" {
+	if cmdName == "multi" { // multi指令用于开启事务
 		if len(cmdLine) != 1 {
 			return protocol.MakeArgNumErrReply(cmdName)
 		}
 		return StartMulti(c)
-	} else if cmdName == "discard" {
+	} else if cmdName == "discard" { // 取消事务
 		if len(cmdLine) != 1 {
 			return protocol.MakeArgNumErrReply(cmdName)
 		}
 		return DiscardMulti(c)
-	} else if cmdName == "exec" {
+	} else if cmdName == "exec" { // 执行事务   multi开启事务，exec执行事务
 		if len(cmdLine) != 1 {
 			return protocol.MakeArgNumErrReply(cmdName)
 		}
@@ -97,25 +97,25 @@ func (db *DB) Exec(c redis.Connection, cmdLine [][]byte) redis.Reply {
 		return Watch(db, c, cmdLine[1:])
 	}
 	if c != nil && c.InMultiState() {
-		return EnqueueCmd(c, cmdLine)
+		return EnqueueCmd(c, cmdLine) // 处于事务模式，把命令存起来，而不是执行
 	}
 
 	return db.execNormalCommand(cmdLine)
 }
 
 func (db *DB) execNormalCommand(cmdLine [][]byte) redis.Reply {
-	cmdName := strings.ToLower(string(cmdLine[0]))
-	cmd, ok := cmdTable[cmdName]
+	cmdName := strings.ToLower(string(cmdLine[0])) // 获取要执行的指令的名称
+	cmd, ok := cmdTable[cmdName]                   // 去注册表中查询
 	if !ok {
 		return protocol.MakeErrReply("ERR unknown command '" + cmdName + "'")
 	}
-	if !validateArity(cmd.arity, cmdLine) {
+	if !validateArity(cmd.arity, cmdLine) { // 注册的函数参数和传入的参数是否相同
 		return protocol.MakeArgNumErrReply(cmdName)
 	}
 
 	prepare := cmd.prepare
-	write, read := prepare(cmdLine[1:])
-	db.addVersion(write...)
+	write, read := prepare(cmdLine[1:]) // 返回两个string数组
+	db.addVersion(write...)             // 把write中的key 放到versionMap中，可能是为了实现事务，
 	db.RWLocks(write, read)
 	defer db.RWUnLocks(write, read)
 	fun := cmd.executor
@@ -242,7 +242,7 @@ func genExpireTask(key string) string {
 
 // Expire sets ttlCmd of key
 func (db *DB) Expire(key string, expireTime time.Time) {
-	db.ttlMap.Put(key, expireTime)
+	db.ttlMap.Put(key, expireTime) // 添加到ttlMap
 	taskKey := genExpireTask(key)
 	timewheel.At(expireTime, taskKey, func() {
 		keys := []string{key}

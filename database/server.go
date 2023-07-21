@@ -92,6 +92,7 @@ func NewStandaloneServer() *Server {
 
 // Exec executes command
 // parameter `cmdLine` contains command and its arguments, for example: "set key value"
+// 这里的主体是server 是0-15数据库的整和部分来执行指令，后面具体分库的执行在最后
 func (server *Server) Exec(c redis.Connection, cmdLine [][]byte) (result redis.Reply) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -100,22 +101,24 @@ func (server *Server) Exec(c redis.Connection, cmdLine [][]byte) (result redis.R
 		}
 	}()
 
-	cmdName := strings.ToLower(string(cmdLine[0]))
+	cmdName := strings.ToLower(string(cmdLine[0])) // 第一个参数，用来判断是何种命令
 	// ping
 	if cmdName == "ping" {
 		return Ping(c, cmdLine[1:])
 	}
-	// authenticate
+	// authenticate 用于对连接身份的校验 auth password
 	if cmdName == "auth" {
 		return Auth(c, cmdLine[1:])
 	}
 	if !isAuthenticated(c) {
 		return protocol.MakeErrReply("NOAUTH Authentication required")
 	}
-	// info
+	// info 获取redis server的各种信息
 	if cmdName == "info" {
 		return Info(server, cmdLine[1:])
 	}
+	// 设置主从关系 SLAVEOF masterip masterport
+	// masterip是主服务器的IP地址，masterport是主服务器的端口号。
 	if cmdName == "slaveof" {
 		if c != nil && c.InMultiState() {
 			return protocol.MakeErrReply("cannot use slave of database within multi")
@@ -125,14 +128,14 @@ func (server *Server) Exec(c redis.Connection, cmdLine [][]byte) (result redis.R
 		}
 		return server.execSlaveOf(c, cmdLine[1:])
 	} else if cmdName == "command" {
-		return execCommand(cmdLine[1:])
+		return execCommand(cmdLine[1:]) // 获取所有命令
 	}
 
-	// read only slave
+	// read only slave 从库只能读
 	role := atomic.LoadInt32(&server.role)
 	if role == slaveRole && !c.IsMaster() {
 		// only allow read only command, forbid all special commands except `auth` and `slaveof`
-		if !isReadOnlyCommand(cmdName) {
+		if !isReadOnlyCommand(cmdName) { // 如果是从库，判断是不是只读指令
 			return protocol.MakeErrReply("READONLY You can't write against a read only slave.")
 		}
 	}
@@ -148,6 +151,7 @@ func (server *Server) Exec(c redis.Connection, cmdLine [][]byte) (result redis.R
 	} else if cmdName == "unsubscribe" {
 		return pubsub.UnSubscribe(server.hub, c, cmdLine[1:])
 	} else if cmdName == "bgrewriteaof" {
+		// 重写aof
 		if !config.Properties.AppendOnly {
 			return protocol.MakeErrReply("AppendOnly is false, you can't rewrite aof file")
 		}
@@ -158,7 +162,7 @@ func (server *Server) Exec(c redis.Connection, cmdLine [][]byte) (result redis.R
 			return protocol.MakeErrReply("AppendOnly is false, you can't rewrite aof file")
 		}
 		return RewriteAOF(server, cmdLine[1:])
-	} else if cmdName == "flushall" {
+	} else if cmdName == "flushall" { //
 		return server.flushAll()
 	} else if cmdName == "flushdb" {
 		if !validateArity(1, cmdLine) {
@@ -194,11 +198,11 @@ func (server *Server) Exec(c redis.Connection, cmdLine [][]byte) (result redis.R
 
 	// normal commands
 	dbIndex := c.GetDBIndex()
-	selectedDB, errReply := server.selectDB(dbIndex)
+	selectedDB, errReply := server.selectDB(dbIndex) // 获取到0-15数据库
 	if errReply != nil {
 		return errReply
 	}
-	return selectedDB.Exec(c, cmdLine)
+	return selectedDB.Exec(c, cmdLine) // 0-15 数据库执行指令
 }
 
 // AfterClientClose does some clean after client close connection

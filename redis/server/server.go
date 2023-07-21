@@ -57,11 +57,11 @@ func (h *Handler) Handle(ctx context.Context, conn net.Conn) {
 		return
 	}
 
-	client := connection.NewConn(conn)
-	h.activeConn.Store(client, struct{}{})
+	client := connection.NewConn(conn)     // 创建一个连接
+	h.activeConn.Store(client, struct{}{}) // 把这个连接存起来
 
-	ch := parser.ParseStream(conn)
-	for payload := range ch {
+	ch := parser.ParseStream(conn) // 解析协议收到的数据，数据放到ch中
+	for payload := range ch {      // 遍历每一个接受的payload
 		if payload.Err != nil {
 			if payload.Err == io.EOF ||
 				payload.Err == io.ErrUnexpectedEOF ||
@@ -85,14 +85,14 @@ func (h *Handler) Handle(ctx context.Context, conn net.Conn) {
 			logger.Error("empty payload")
 			continue
 		}
-		r, ok := payload.Data.(*protocol.MultiBulkReply)
+		r, ok := payload.Data.(*protocol.MultiBulkReply) //接收到的数据类型断言
 		if !ok {
 			logger.Error("require multi bulk protocol")
 			continue
 		}
-		result := h.db.Exec(client, r.Args)
+		result := h.db.Exec(client, r.Args) //执行接收到的命令
 		if result != nil {
-			_, _ = client.Write(result.ToBytes())
+			_, _ = client.Write(result.ToBytes()) // 把执行的回复写回conn
 		} else {
 			_, _ = client.Write(unknownErrReplyBytes)
 		}

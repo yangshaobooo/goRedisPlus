@@ -56,6 +56,8 @@ func initReplSlaveStatus() *slaveStatus {
 	return &slaveStatus{}
 }
 
+// execSlaveOf 执行SLAVEOF命令后，当前服务器将尝试连接到指定的主服务器，并开始复制主服务器的数据。复制过程中，当前服务器将成为主服务器的从服务器，并从主服务器接收数据更新。
+//需要注意的是，执行SLAVEOF命令后，当前服务器的数据将被清空，并根据主服务器的数据进行重新同步。因此，在执行SLAVEOF命令之前，应该确保当前服务器中的数据已经备份或不再需要。
 func (server *Server) execSlaveOf(c redis.Connection, args [][]byte) redis.Reply {
 	if strings.ToLower(string(args[0])) == "no" &&
 		strings.ToLower(string(args[1])) == "one" {

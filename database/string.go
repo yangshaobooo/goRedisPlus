@@ -40,8 +40,8 @@ func execGet(db *DB, args [][]byte) redis.Reply {
 
 const (
 	upsertPolicy = iota // default
-	insertPolicy        // set nx
-	updatePolicy        // set ex
+	insertPolicy        // set nx 不存在才插入
+	updatePolicy        // set ex 存在才插入，也就是更新
 )
 
 const unlimitedTTL int64 = 0
@@ -75,8 +75,8 @@ func execGetEX(db *DB, args [][]byte) redis.Reply {
 			if ttlArg <= 0 {
 				return protocol.MakeErrReply("ERR invalid expire time in getex")
 			}
-			ttl = ttlArg * 1000
-			i++ // skip next arg
+			ttl = ttlArg * 1000 // 原本的单位是毫秒，这里扩展为s
+			i++                 // skip next arg  // 因为下一个参数是时间
 		} else if arg == "PX" { // ttl in milliseconds
 			if ttl != unlimitedTTL {
 				return &protocol.SyntaxErrReply{}
@@ -100,13 +100,13 @@ func execGetEX(db *DB, args [][]byte) redis.Reply {
 			if i+1 > len(args) {
 				return &protocol.SyntaxErrReply{}
 			}
-			db.Persist(key)
+			db.Persist(key) // 设置永远？
 		}
 	}
 
 	if len(args) > 1 {
 		if ttl != unlimitedTTL { // EX | PX
-			expireTime := time.Now().Add(time.Duration(ttl) * time.Millisecond)
+			expireTime := time.Now().Add(time.Duration(ttl) * time.Millisecond) // 当前时间加上存在的时间，一个到期时间的时间戳
 			db.Expire(key, expireTime)
 			db.addAof(aof.MakeExpireCmd(key, expireTime).Args)
 		} else { // PERSIST
@@ -122,7 +122,7 @@ func execGetEX(db *DB, args [][]byte) redis.Reply {
 func execSet(db *DB, args [][]byte) redis.Reply {
 	key := string(args[0])
 	value := args[1]
-	policy := upsertPolicy
+	policy := upsertPolicy // 选择插入策略：直接插入
 	ttl := unlimitedTTL
 
 	// parse options
@@ -177,14 +177,14 @@ func execSet(db *DB, args [][]byte) redis.Reply {
 			}
 		}
 	}
-
+	// 接口类型
 	entity := &database.DataEntity{
 		Data: value,
 	}
 
 	var result int
 	switch policy {
-	case upsertPolicy:
+	case upsertPolicy: // 直接插入
 		db.PutEntity(key, entity)
 		result = 1
 	case insertPolicy:
