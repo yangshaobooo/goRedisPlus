@@ -242,8 +242,8 @@ func genExpireTask(key string) string {
 
 // Expire sets ttlCmd of key
 func (db *DB) Expire(key string, expireTime time.Time) {
-	db.ttlMap.Put(key, expireTime) // 添加到ttlMap
-	taskKey := genExpireTask(key)
+	db.ttlMap.Put(key, expireTime) // 添加到ttlMap 也是concurrentMap 分片的
+	taskKey := genExpireTask(key)  // 拼接一个key
 	timewheel.At(expireTime, taskKey, func() {
 		keys := []string{key}
 		db.RWLocks(keys, nil)
@@ -255,9 +255,9 @@ func (db *DB) Expire(key string, expireTime time.Time) {
 			return
 		}
 		expireTime, _ := rawExpireTime.(time.Time)
-		expired := time.Now().After(expireTime)
+		expired := time.Now().After(expireTime) // 比较过期时间和当前时间的大小
 		if expired {
-			db.Remove(key)
+			db.Remove(key) // 删除key
 		}
 	})
 }

@@ -133,13 +133,14 @@ func (dict *ConcurrentDict) Put(key string, val interface{}) (result int) {
 	return 1
 }
 
+// PutWithLock without lock 没有锁
 func (dict *ConcurrentDict) PutWithLock(key string, val interface{}) (result int) {
 	if dict == nil {
 		panic("dict is nil")
 	}
-	hashCode := fnv32(key)
-	index := dict.spread(hashCode)
-	s := dict.getShard(index)
+	hashCode := fnv32(key)         // 计算hash值
+	index := dict.spread(hashCode) // 计算属于哪个分片
+	s := dict.getShard(index)      // 得到这个分片
 
 	if _, ok := s.m[key]; ok {
 		s.m[key] = val

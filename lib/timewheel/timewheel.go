@@ -8,14 +8,14 @@ import (
 
 type location struct {
 	slot  int
-	etask *list.Element
+	etask *list.Element // 双向链表中的一个元素
 }
 
 // TimeWheel can execute job after waiting given duration
 type TimeWheel struct {
 	interval time.Duration
 	ticker   *time.Ticker
-	slots    []*list.List
+	slots    []*list.List // 双向链表列表
 
 	timer             map[string]*location
 	currentPos        int
@@ -42,7 +42,7 @@ func New(interval time.Duration, slotNum int) *TimeWheel {
 		slots:             make([]*list.List, slotNum),
 		timer:             make(map[string]*location),
 		currentPos:        0,
-		slotNum:           slotNum,
+		slotNum:           slotNum, // 位置数量 3600 前面用new调用 参数3600
 		addTaskChannel:    make(chan task),
 		removeTaskChannel: make(chan string),
 		stopChannel:       make(chan bool),
@@ -54,13 +54,13 @@ func New(interval time.Duration, slotNum int) *TimeWheel {
 
 func (tw *TimeWheel) initSlots() {
 	for i := 0; i < tw.slotNum; i++ {
-		tw.slots[i] = list.New()
+		tw.slots[i] = list.New() // 创建3600个新的链表
 	}
 }
 
 // Start starts ticker for time wheel
 func (tw *TimeWheel) Start() {
-	tw.ticker = time.NewTicker(tw.interval)
+	tw.ticker = time.NewTicker(tw.interval) // 一个定时器，每隔internal时间，发送一个信号
 	go tw.start()
 }
 
@@ -89,13 +89,13 @@ func (tw *TimeWheel) RemoveJob(key string) {
 func (tw *TimeWheel) start() {
 	for {
 		select {
-		case <-tw.ticker.C:
+		case <-tw.ticker.C: // 定时器发来的消息
 			tw.tickHandler()
-		case task := <-tw.addTaskChannel:
+		case task := <-tw.addTaskChannel: // 添加任务通道的消息
 			tw.addTask(&task)
-		case key := <-tw.removeTaskChannel:
+		case key := <-tw.removeTaskChannel: // 移除任务通道的消息
 			tw.removeTask(key)
-		case <-tw.stopChannel:
+		case <-tw.stopChannel: // 结束时间轮的消息
 			tw.ticker.Stop()
 			return
 		}
@@ -103,7 +103,7 @@ func (tw *TimeWheel) start() {
 }
 
 func (tw *TimeWheel) tickHandler() {
-	l := tw.slots[tw.currentPos]
+	l := tw.slots[tw.currentPos] // 获取一个双向链表
 	if tw.currentPos == tw.slotNum-1 {
 		tw.currentPos = 0
 	} else {
@@ -113,8 +113,8 @@ func (tw *TimeWheel) tickHandler() {
 }
 
 func (tw *TimeWheel) scanAndRunTask(l *list.List) {
-	for e := l.Front(); e != nil; {
-		task := e.Value.(*task)
+	for e := l.Front(); e != nil; { // 获取头节点
+		task := e.Value.(*task) // 类型断言
 		if task.circle > 0 {
 			task.circle--
 			e = e.Next()

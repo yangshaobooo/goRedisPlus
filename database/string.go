@@ -192,11 +192,12 @@ func execSet(db *DB, args [][]byte) redis.Reply {
 	case updatePolicy:
 		result = db.PutIfExists(key, entity)
 	}
+	// 存完key-value之后，如果存入成功，那么就添加ttl
 	if result > 0 {
-		if ttl != unlimitedTTL {
-			expireTime := time.Now().Add(time.Duration(ttl) * time.Millisecond)
+		if ttl != unlimitedTTL { // 不是无限时间
+			expireTime := time.Now().Add(time.Duration(ttl) * time.Millisecond) // 到期时间=当前时间+时长
 			db.Expire(key, expireTime)
-			db.addAof(CmdLine{
+			db.addAof(CmdLine{ // 追加写，保存
 				[]byte("SET"),
 				args[0],
 				args[1],
