@@ -6,17 +6,16 @@ import (
 	"time"
 )
 
-type location struct {
+type location struct { // 一个整形位置，一个指针
 	slot  int
 	etask *list.Element // 双向链表中的一个元素
 }
 
 // TimeWheel can execute job after waiting given duration
 type TimeWheel struct {
-	interval time.Duration
-	ticker   *time.Ticker
-	slots    []*list.List // 双向链表列表
-
+	interval          time.Duration
+	ticker            *time.Ticker
+	slots             []*list.List // 双向链表头节点数组
 	timer             map[string]*location
 	currentPos        int
 	slotNum           int
@@ -42,8 +41,8 @@ func New(interval time.Duration, slotNum int) *TimeWheel {
 		slots:             make([]*list.List, slotNum),
 		timer:             make(map[string]*location),
 		currentPos:        0,
-		slotNum:           slotNum, // 位置数量 3600 前面用new调用 参数3600
-		addTaskChannel:    make(chan task),
+		slotNum:           slotNum,         // 位置数量 3600 前面用new调用 参数3600
+		addTaskChannel:    make(chan task), // 都是无缓冲的channel，阻塞
 		removeTaskChannel: make(chan string),
 		stopChannel:       make(chan bool),
 	}
@@ -60,7 +59,7 @@ func (tw *TimeWheel) initSlots() {
 
 // Start starts ticker for time wheel
 func (tw *TimeWheel) Start() {
-	tw.ticker = time.NewTicker(tw.interval) // 一个定时器，每隔internal时间，发送一个信号
+	tw.ticker = time.NewTicker(tw.interval) // 一个定时器，每隔internal:1s 时间，发送一个信号
 	go tw.start()
 }
 
@@ -113,11 +112,11 @@ func (tw *TimeWheel) tickHandler() {
 }
 
 func (tw *TimeWheel) scanAndRunTask(l *list.List) {
-	for e := l.Front(); e != nil; { // 获取头节点
+	for e := l.Front(); e != nil; { // 从头节点开始一直到nil
 		task := e.Value.(*task) // 类型断言
-		if task.circle > 0 {
+		if task.circle > 0 {    // 没有circle++ 计数是因为这里我们对存的数进行--
 			task.circle--
-			e = e.Next()
+			e = e.Next() // 下一个节点
 			continue
 		}
 
@@ -133,7 +132,7 @@ func (tw *TimeWheel) scanAndRunTask(l *list.List) {
 		next := e.Next()
 		l.Remove(e)
 		if task.key != "" {
-			delete(tw.timer, task.key)
+			delete(tw.timer, task.key) // 这里不清楚这个有什么用
 		}
 		e = next
 	}
@@ -143,13 +142,13 @@ func (tw *TimeWheel) addTask(task *task) {
 	pos, circle := tw.getPositionAndCircle(task.delay)
 	task.circle = circle
 
-	e := tw.slots[pos].PushBack(task)
+	e := tw.slots[pos].PushBack(task) // 添加到链表结尾
 	loc := &location{
 		slot:  pos,
 		etask: e,
 	}
 	if task.key != "" {
-		_, ok := tw.timer[task.key]
+		_, ok := tw.timer[task.key] // 如果已经有这个key，删掉重新添加
 		if ok {
 			tw.removeTask(task.key)
 		}
@@ -160,8 +159,8 @@ func (tw *TimeWheel) addTask(task *task) {
 func (tw *TimeWheel) getPositionAndCircle(d time.Duration) (pos int, circle int) {
 	delaySeconds := int(d.Seconds())
 	intervalSeconds := int(tw.interval.Seconds())
-	circle = int(delaySeconds / intervalSeconds / tw.slotNum)
-	pos = int(tw.currentPos+delaySeconds/intervalSeconds) % tw.slotNum
+	circle = int(delaySeconds / intervalSeconds / tw.slotNum)          // 计算圈数
+	pos = int(tw.currentPos+delaySeconds/intervalSeconds) % tw.slotNum // 计算单圈位置
 
 	return
 }
