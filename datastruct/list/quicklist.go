@@ -30,15 +30,15 @@ func NewQuickList() *QuickList {
 func (ql *QuickList) Add(val interface{}) {
 	ql.size++
 	if ql.data.Len() == 0 { // empty list
-		page := make([]interface{}, 0, pageSize)
+		page := make([]interface{}, 0, pageSize) // 双向链表的每一个节点就是一个 固定大小的切片
 		page = append(page, val)
 		ql.data.PushBack(page)
 		return
 	}
 	// assert list.data.Back() != nil
 	backNode := ql.data.Back()
-	backPage := backNode.Value.([]interface{})
-	if len(backPage) == cap(backPage) { // full page, create new page
+	backPage := backNode.Value.([]interface{}) // 最后一个节点的value
+	if len(backPage) == cap(backPage) {        // full page, create new page
 		page := make([]interface{}, 0, pageSize)
 		page = append(page, val)
 		ql.data.PushBack(page)
@@ -49,6 +49,7 @@ func (ql *QuickList) Add(val interface{}) {
 	backNode.Value = backPage
 }
 
+// 为什么quickList的find要更快。
 // find returns page and in-page-offset of given index
 func (ql *QuickList) find(index int) *iterator {
 	if ql == nil {
@@ -67,7 +68,7 @@ func (ql *QuickList) find(index int) *iterator {
 		for {
 			// assert: n != nil
 			page = n.Value.([]interface{})
-			if pageBeg+len(page) > index {
+			if pageBeg+len(page) > index { // 在不在这个节点里面
 				break
 			}
 			pageBeg += len(page)
@@ -177,12 +178,12 @@ func (ql *QuickList) Set(index int, val interface{}) {
 }
 
 func (ql *QuickList) Insert(index int, val interface{}) {
-	if index == ql.size { // insert at
+	if index == ql.size { // 插入位置等于长度，也就是插在尾部
 		ql.Add(val)
 		return
 	}
-	iter := ql.find(index)
-	page := iter.node.Value.([]interface{})
+	iter := ql.find(index)                  // quickList 的find更快
+	page := iter.node.Value.([]interface{}) // 把接口切片取出来
 	if len(page) < pageSize {
 		// insert into not full page
 		page = append(page[:iter.offset+1], page[iter.offset:]...)
@@ -192,20 +193,21 @@ func (ql *QuickList) Insert(index int, val interface{}) {
 		return
 	}
 	// insert into a full page may cause memory copy, so we split a full page into two half pages
+	// 可以只复制一半元素就可以，减少复制开销，同时留出空间，避免频繁的进行内存复制，后续插入的时候不需要复制，但是缺点就是浪费了一部分内存空间。空间换时间。
 	var nextPage []interface{}
-	nextPage = append(nextPage, page[pageSize/2:]...) // pageSize must be even
-	page = page[:pageSize/2]
-	if iter.offset < len(page) {
-		page = append(page[:iter.offset+1], page[iter.offset:]...)
+	nextPage = append(nextPage, page[pageSize/2:]...) // pageSize must be even  后半段进行了复制
+	page = page[:pageSize/2]                          // 前半段没有复制
+	if iter.offset < len(page) {                      // 如果小于一半
+		page = append(page[:iter.offset+1], page[iter.offset:]...) // 插入到前半段
 		page[iter.offset] = val
 	} else {
 		i := iter.offset - pageSize/2
-		nextPage = append(nextPage[:i+1], nextPage[i:]...)
+		nextPage = append(nextPage[:i+1], nextPage[i:]...) // 插入到后半段
 		nextPage[i] = val
 	}
 	// store current page and next page
-	iter.node.Value = page
-	ql.data.InsertAfter(nextPage, iter.node)
+	iter.node.Value = page                   // 前半段
+	ql.data.InsertAfter(nextPage, iter.node) // 把后半段这个节点插入到双向链表中
 	ql.size++
 }
 

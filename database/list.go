@@ -11,8 +11,10 @@ import (
 	"strings"
 )
 
+// 其实redis 所有的数据类型的存储方式都是通过key-value的形式存储的，区别在于value的不一样
+
 func (db *DB) getAsList(key string) (List.List, protocol.ErrorReply) {
-	entity, ok := db.GetEntity(key)
+	entity, ok := db.GetEntity(key) // 根据key得到list，这个key-list 的底层还是通过concurrent来实现的
 	if !ok {
 		return nil, nil
 	}
@@ -29,8 +31,8 @@ func (db *DB) getOrInitList(key string) (list List.List, isNew bool, errReply pr
 		return nil, false, errReply
 	}
 	isNew = false
-	if list == nil {
-		list = List.NewQuickList()
+	if list == nil { // 如果没有list，那么新建一个list
+		list = List.NewQuickList() // 底层数据结构的实现是quickList
 		db.PutEntity(key, &database.DataEntity{
 			Data: list,
 		})
@@ -137,13 +139,13 @@ func execLPush(db *DB, args [][]byte) redis.Reply {
 	values := args[1:]
 	fmt.Printf("向key:%v 中，插入的数据是:%s\n", key, values)
 	// get or init entity
-	list, _, errReply := db.getOrInitList(key)
+	list, _, errReply := db.getOrInitList(key) // 获取list
 	if errReply != nil {
 		return errReply
 	}
 
 	// insert
-	for _, value := range values {
+	for _, value := range values { // 在链表头部插入
 		list.Insert(0, value)
 	}
 
