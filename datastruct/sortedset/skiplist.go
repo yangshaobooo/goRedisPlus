@@ -17,21 +17,21 @@ type Element struct {
 
 // Level aspect of a node
 type Level struct {
-	forward *node // forward node has greater score
+	forward *node // forward node has greater score 下一个元素
 	span    int64
 }
 
 type node struct {
 	Element
-	backward *node
+	backward *node    // 前一个节点的指针
 	level    []*Level // level[0] is base level
 }
 
 type skiplist struct {
 	header *node
 	tail   *node
-	length int64
-	level  int16
+	length int64 // 节点数量
+	level  int16 // 最大索引层级
 }
 
 func makeNode(level int16, score float64, member string) *node {
@@ -40,9 +40,9 @@ func makeNode(level int16, score float64, member string) *node {
 			Score:  score,
 			Member: member,
 		},
-		level: make([]*Level, level),
+		level: make([]*Level, level), // 这里我们跳表的索引级别设置为16，正常的redis设置的是32
 	}
-	for i := range n.level {
+	for i := range n.level { // 初始化16级的空索引，由此可见占用比较大的空间
 		n.level[i] = new(Level)
 	}
 	return n
@@ -50,7 +50,7 @@ func makeNode(level int16, score float64, member string) *node {
 
 func makeSkiplist() *skiplist {
 	return &skiplist{
-		level:  1,
+		level:  1, // 默认级别1 相当于单链表级别
 		header: makeNode(maxLevel, 0, ""),
 	}
 }
@@ -85,7 +85,7 @@ func (skiplist *skiplist) insert(member string, score float64) *node {
 		update[i] = node
 	}
 
-	level := randomLevel()
+	level := randomLevel() // 这个节点的最高级别
 	// extend skiplist level
 	if level > skiplist.level {
 		for i := skiplist.level; i < level; i++ {
@@ -98,7 +98,7 @@ func (skiplist *skiplist) insert(member string, score float64) *node {
 
 	// make node and link into skiplist
 	node = makeNode(level, score, member)
-	for i := int16(0); i < level; i++ {
+	for i := int16(0); i < level; i++ { // 从最底层开始，到我们生成的随机层级
 		node.level[i].forward = update[i].level[i].forward
 		update[i].level[i].forward = node
 

@@ -104,8 +104,8 @@ func execLPop(db *DB, args [][]byte) redis.Reply {
 		return &protocol.NullBulkReply{}
 	}
 
-	val, _ := list.Remove(0).([]byte)
-	if list.Len() == 0 {
+	val, _ := list.Remove(0).([]byte) // 删除第一个元素
+	if list.Len() == 0 {              // 如果list为空，直接删除这个key
 		db.Remove(key)
 	}
 	db.addAof(utils.ToCmdLine3("lpop", args...))

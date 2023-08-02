@@ -18,19 +18,19 @@ func Make() *SortedSet {
 
 // Add puts member into set,  and returns whether it has inserted new node
 func (sortedSet *SortedSet) Add(member string, score float64) bool {
-	element, ok := sortedSet.dict[member]
-	sortedSet.dict[member] = &Element{
+	element, ok := sortedSet.dict[member] // 判断元素存不存在
+	sortedSet.dict[member] = &Element{    // 这里就先把map里面内容的先写上了
 		Member: member,
 		Score:  score,
 	}
-	if ok {
+	if ok { // 如果存在，但是分数不一样，相当于我要更新
 		if score != element.Score {
-			sortedSet.skiplist.remove(member, element.Score)
-			sortedSet.skiplist.insert(member, score)
+			sortedSet.skiplist.remove(member, element.Score) // 跳表删除旧的分数
+			sortedSet.skiplist.insert(member, score)         // 添加新的分数
 		}
 		return false
 	}
-	sortedSet.skiplist.insert(member, score)
+	sortedSet.skiplist.insert(member, score) // 跳表里添加元素
 	return true
 }
 

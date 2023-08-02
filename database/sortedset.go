@@ -40,12 +40,13 @@ func (db *DB) getOrInitSortedSet(key string) (sortedSet *SortedSet.SortedSet, in
 }
 
 // execZAdd adds member into sorted set
+// zAdd key score member
 func execZAdd(db *DB, args [][]byte) redis.Reply {
 	if len(args)%2 != 1 {
 		return protocol.MakeSyntaxErrReply()
 	}
 	key := string(args[0])
-	size := (len(args) - 1) / 2
+	size := (len(args) - 1) / 2 // 看有多少个元素，每两个为一组 score : member
 	elements := make([]*SortedSet.Element, size)
 	for i := 0; i < size; i++ {
 		scoreValue := args[2*i+1]
