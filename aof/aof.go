@@ -77,20 +77,20 @@ func NewPersister(db database.DBEngine, filename string, load bool, fsync string
 	persister.aofFilename = filename
 	persister.aofFsync = strings.ToLower(fsync)
 	persister.db = db
-	persister.tmpDBMaker = tmpDBMaker
+	persister.tmpDBMaker = tmpDBMaker // 为什么需要这个临时的整个redis数据库
 	persister.currentDB = 0
 	// load aof file if needed
 	if load {
 		persister.LoadAof(0)
 	}
-	aofFile, err := os.OpenFile(persister.aofFilename, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0600)
+	aofFile, err := os.OpenFile(persister.aofFilename, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0600) // 打开aof文件
 	if err != nil {
 		return nil, err
 	}
 	persister.aofFile = aofFile
-	persister.aofChan = make(chan *payload, aofQueueSize)
+	persister.aofChan = make(chan *payload, aofQueueSize) // channel用来存放数据
 	persister.aofFinished = make(chan struct{})
-	persister.listeners = make(map[Listener]struct{})
+	persister.listeners = make(map[Listener]struct{}) // 这个应该是和主从复制相关
 	// start aof goroutine to write aof file in background and fsync periodically if needed (see fsyncEverySecond)
 	go func() {
 		persister.listenCmd()
@@ -287,7 +287,7 @@ func (persister *Persister) generateAof(ctx *RewriteCtx) error {
 	tmpFile := ctx.tmpFile
 	// load aof tmpFile
 	tmpAof := persister.newRewriteHandler()
-	tmpAof.LoadAof(int(ctx.fileSize))
+	tmpAof.LoadAof(int(ctx.fileSize)) // tempAof 里面没有数据
 	for i := 0; i < config.Properties.Databases; i++ {
 		// select db
 		data := protocol.MakeMultiBulkReply(utils.ToCmdLine("SELECT", strconv.Itoa(i))).ToBytes()

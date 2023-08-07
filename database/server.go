@@ -21,6 +21,7 @@ import (
 var godisVersion = "1.2.8" // do not modify
 
 // Server is a redis-server with full capabilities including multiple database, rdb loader, replication
+// 这个表示的是整个redis 0-15 数据库
 type Server struct {
 	dbSet []*atomic.Value // *DB
 
@@ -46,7 +47,7 @@ func fileExists(filename string) bool {
 
 // NewStandaloneServer creates a standalone redis server, with multi database and all other funtions
 func NewStandaloneServer() *Server {
-	server := &Server{}
+	server := &Server{} // 初始化的是整个redis的变量
 	if config.Properties.Databases == 0 {
 		config.Properties.Databases = 16
 	}
@@ -56,16 +57,17 @@ func NewStandaloneServer() *Server {
 		panic(fmt.Errorf("create tmp dir failed: %v", err))
 	}
 	// make db set
-	server.dbSet = make([]*atomic.Value, config.Properties.Databases)
+	server.dbSet = make([]*atomic.Value, config.Properties.Databases) // 创建16个分数据库
 	for i := range server.dbSet {
-		singleDB := makeDB()
+		singleDB := makeDB() // 初始化一个分数据库
 		singleDB.index = i
-		holder := &atomic.Value{}
+		holder := &atomic.Value{} //atomic.Value 是 Go 语言提供的原子值类型，用于在并发环境中安全地存储和加载值
 		holder.Store(singleDB)
 		server.dbSet[i] = holder
 	}
 	server.hub = pubsub.MakeHub()
 	// record aof
+	// aof 是作用于整个redis的，不是作用于每一个分数据库
 	validAof := false
 	if config.Properties.AppendOnly {
 		validAof = fileExists(config.Properties.AppendFilename)

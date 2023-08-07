@@ -110,7 +110,7 @@ var pExpireAtBytes = []byte("PEXPIREAT")
 // MakeExpireCmd generates command line to set expiration for the given key
 func MakeExpireCmd(key string, expireAt time.Time) *protocol.MultiBulkReply {
 	args := make([][]byte, 3)
-	args[0] = pExpireAtBytes
+	args[0] = pExpireAtBytes   // 换了命令，这样就是直接存储到期时间，防止系统关闭，时间轮重新计时
 	args[1] = []byte(key)
 	args[2] = []byte(strconv.FormatInt(expireAt.UnixNano()/1e6, 10))
 	return protocol.MakeMultiBulkReply(args)

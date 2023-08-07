@@ -107,6 +107,7 @@ func (server *Server) AddAof(dbIndex int, cmdLine CmdLine) {
 func (server *Server) bindPersister(aofHandler *aof.Persister) {
 	server.persister = aofHandler
 	// bind SaveCmdLine
+	// aof是作用于整个redis的，但是我们需要每个分数据库绑定一个存储函数，方便分数据库调用这个函数
 	for _, db := range server.dbSet {
 		singleDB := db.Load().(*DB)
 		singleDB.addAof = func(line CmdLine) {

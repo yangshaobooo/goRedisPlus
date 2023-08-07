@@ -56,10 +56,10 @@ func (persister *Persister) DoRewrite(ctx *RewriteCtx) (err error) {
 // StartRewrite prepares rewrite procedure
 func (persister *Persister) StartRewrite() (*RewriteCtx, error) {
 	// pausing aof
-	persister.pausingAof.Lock()
+	persister.pausingAof.Lock() // rewrite write Fsync 这三个操作是互斥的
 	defer persister.pausingAof.Unlock()
 
-	err := persister.aofFile.Sync()
+	err := persister.aofFile.Sync() // 重写之前先落盘
 	if err != nil {
 		logger.Warn("fsync failed")
 		return nil, err

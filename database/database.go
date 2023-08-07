@@ -17,6 +17,7 @@ const (
 )
 
 // DB stores data and execute user's commands
+// 这个DB表示redis中0-15 中的一个数据库
 type DB struct {
 	index int
 	// key -> DataEntity
