@@ -122,7 +122,7 @@ func (server *Server) Exec(c redis.Connection, cmdLine [][]byte) (result redis.R
 	// 设置主从关系 SLAVEOF masterip masterport
 	// masterip是主服务器的IP地址，masterport是主服务器的端口号。
 	if cmdName == "slaveof" {
-		if c != nil && c.InMultiState() {
+		if c != nil && c.InMultiState() { // 开启事务的时候不能设置从库
 			return protocol.MakeErrReply("cannot use slave of database within multi")
 		}
 		if len(cmdLine) != 3 {

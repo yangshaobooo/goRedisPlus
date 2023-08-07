@@ -7,7 +7,7 @@ import (
 	"goRedisPlus/redis/protocol"
 )
 
-// relay function relays command to peer or calls cluster.Exec
+// relay 转发 function relays command to peer or calls cluster.Exec
 func (cluster *Cluster) relay(peerId string, c redis.Connection, cmdLine [][]byte) redis.Reply {
 	// use a variable to allow injecting stub for testing, see defaultRelayImpl
 	if peerId == cluster.self {

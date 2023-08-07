@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"goRedisPlus/cluster"
+	"goRedisPlus/config"
 	database2 "goRedisPlus/database"
 	"goRedisPlus/interface/database"
 	"goRedisPlus/lib/logger"
@@ -30,14 +32,13 @@ type Handler struct {
 func MakeHandler() *Handler {
 	var db database.DB
 	// 先不考虑集群
-	//if config.Properties.ClusterEnable {
-	//	// 创建集群数据库
-	//	db = cluster.MakeCluster()
-	//} else {
-	//	// 创建常规的数据库
-	//	db = database2.NewStandaloneServer()
-	//}
-	db = database2.NewStandaloneServer()
+	if config.Properties.ClusterEnable {
+		// 创建集群数据库
+		db = cluster.MakeCluster()
+	} else {
+		// 创建常规的数据库
+		db = database2.NewStandaloneServer()
+	}
 	return &Handler{
 		db: db,
 	}
