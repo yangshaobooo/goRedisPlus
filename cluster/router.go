@@ -20,10 +20,11 @@ func registerDefaultCmd(name string) {
 }
 
 // relay command to responsible peer, and return its protocol to client
+// 默认的函数就是走的转发命令
 func defaultFunc(cluster *Cluster, c redis.Connection, args [][]byte) redis.Reply {
 	key := string(args[1])
-	slotId := getSlot(key)
-	peer := cluster.pickNode(slotId)
+	slotId := getSlot(key)           // 获取key所在的槽位
+	peer := cluster.pickNode(slotId) // 判断槽位id属于哪一个node
 	if peer.ID == cluster.self {
 		err := cluster.ensureKeyWithoutLock(key)
 		if err != nil {

@@ -27,15 +27,15 @@ import (
 type Cluster struct {
 	self          string
 	addr          string
-	db            database.DBEngine
-	transactions  *dict.SimpleDict // id -> Transaction
+	db            database.DBEngine // 每个单独的redis数据库上面都套了一个cluster，这个db就是那个单机版的redis
+	transactions  *dict.SimpleDict  // id -> Transaction
 	transactionMu sync.RWMutex
-	topology      topology
+	topology      topology // 拓扑结构：使用raft
 	slotMu        sync.RWMutex
-	slots         map[uint32]*hostSlot
+	slots         map[uint32]*hostSlot // redis中的槽位
 	idGenerator   *idgenerator.IDGenerator
 
-	clientFactory clientFactory
+	clientFactory clientFactory // 连接工厂
 }
 
 type peerClient interface {
@@ -61,6 +61,9 @@ const (
 )
 
 // hostSlot stores status of host which hosted by current node
+//这个结构体是用于表示 Redis 集群中的槽位（slot）的状态和相关信息的。
+//在 Redis 集群中，数据被分散存储在多个节点上，每个节点负责管理一部分槽位。
+//槽位是 Redis 集群中数据分片的基本单位，总共有 16384 个槽位。
 type hostSlot struct {
 	state uint32
 	mu    sync.RWMutex
@@ -92,20 +95,20 @@ func MakeCluster() *Cluster {
 	cluster := &Cluster{
 		self:          config.Properties.Self,
 		addr:          config.Properties.AnnounceAddress(),
-		db:            database2.NewStandaloneServer(),
+		db:            database2.NewStandaloneServer(), // 底层单机redis
 		transactions:  dict.MakeSimple(),
 		idGenerator:   idgenerator.MakeGenerator(config.Properties.Self),
-		clientFactory: newDefaultClientFactory(),
+		clientFactory: newDefaultClientFactory(), // 默认连接池
 	}
-	topologyPersistFile := path.Join(config.Properties.Dir, config.Properties.ClusterConfigFile)
+	topologyPersistFile := path.Join(config.Properties.Dir, config.Properties.ClusterConfigFile) // 拓扑持久化文件
 	cluster.topology = newRaft(cluster, topologyPersistFile)
-	cluster.db.SetKeyInsertedCallback(cluster.makeInsertCallback())
-	cluster.db.SetKeyDeletedCallback(cluster.makeDeleteCallback())
+	cluster.db.SetKeyInsertedCallback(cluster.makeInsertCallback()) // 每次插入key之后都要把key插入到对应的slot的set中
+	cluster.db.SetKeyDeletedCallback(cluster.makeDeleteCallback())  // 每次删除key之后都要把key从对应的slot的set中删除
 	cluster.slots = make(map[uint32]*hostSlot)
 	var err error
 	if topologyPersistFile != "" && fileExists(topologyPersistFile) {
 		err = cluster.LoadConfig()
-	} else if config.Properties.ClusterAsSeed {
+	} else if config.Properties.ClusterAsSeed { // 作为初始节点启动
 		err = cluster.startAsSeed(config.Properties.AnnounceAddress())
 	} else {
 		err = cluster.Join(config.Properties.ClusterSeed)
@@ -194,15 +197,15 @@ func (cluster *Cluster) LoadRDB(dec *core.Decoder) error {
 
 func (cluster *Cluster) makeInsertCallback() database.KeyEventCallback {
 	return func(dbIndex int, key string, entity *database.DataEntity) {
-		slotId := getSlot(key)
+		slotId := getSlot(key) // 获取key的hash值，也是用的crc32.然后取余16384，得到key所在的槽位id
 		cluster.slotMu.RLock()
-		slot, ok := cluster.slots[slotId]
+		slot, ok := cluster.slots[slotId] // 获取这个槽位
 		cluster.slotMu.RUnlock()
 		// As long as the command is executed, we should update slot.keys regardless of slot.state
 		if ok {
 			slot.mu.Lock()
 			defer slot.mu.Unlock()
-			slot.keys.Add(key)
+			slot.keys.Add(key) // 向这个槽位中添加这个key
 		}
 	}
 }
